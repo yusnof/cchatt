@@ -12,14 +12,12 @@ initial_state(Name) ->
         members = []
     }.
 % Client request to join
-handle(St, {join, ClientPid}) ->
-    case lists:member(ClientPid, St#channel_st.members) of
+handle(St, {join, Pid}) ->
+    case lists:member(Pid, St#channel_st.members) of
         true ->
-            
             {reply, {error, user_already_joined, "Already joined "++St#channel_st.name}, St};
         false ->
-            
-            TempList = [ClientPid | St#channel_st.members],
+            TempList = [Pid | St#channel_st.members],
             {reply, ok, St#channel_st{members=TempList}}
         end;
 

@@ -15,11 +15,12 @@ initial_state() ->
 % Start a new server process with the given name
 % Do not change the signature of this function.
 start(ServerAtom) ->
-    genserver:start(ServerAtom, initial_state(), fun handle/2).
+    catch genserver:start(ServerAtom, initial_state(), fun handle/2).
 
 % Stop the server process registered to the given name,
 % together with any other associated processes
 stop(ServerAtom) ->
+    genserver:request(ServerAtom, delete_all_channels),
     genserver:stop(ServerAtom).
 
 handle(State, {join, Pid, NewUserName, Channel}) ->
@@ -42,16 +43,20 @@ handle(State, {quit, UserName}) ->
 
 %function that handles changing NickName 
 handle(State,{nick, OldUserName, NewUserName})-> 
-    case lists:member(OldUserName, State#serverState.users) of
+    case lists:member(NewUserName, State#serverState.users) of
         true when OldUserName =:= NewUserName ->
-            {reply, nick_taken, State};
-        true when OldUserName /= NewUserName ->
-            TempList = [NewUserName | lists:delete(OldUserName, State#serverState.users)],
-            {reply, ok, State#serverState{users=TempList}};
+            {reply, ok, State};
+        true ->
+            io:format("Hello, world!~n"),
+            {reply, {error, nick_taken, "Username "++NewUserName++" has been taken!"}, State};
         false ->
-            {reply, {error, user_not_found}, State}
+            TempList = [NewUserName | lists:delete(OldUserName, State#serverState.users)],
+            {reply, ok, State#serverState{users=TempList}}
         end;
 
+handle(State, delete_all_channels) ->
+lists:foreach(fun(Ch) -> genserver:stop(list_to_atom(Ch)) end, State),
+{reply,ok,[]};
 
 %ToDo catch other commands with some type of exeption
 handle(State, _ ) ->
