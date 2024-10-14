@@ -42,12 +42,14 @@ handle(State, {quit, UserName}) ->
 
 %function that handles changing NickName 
 handle(State,{nick, OldUserName, NewUserName})-> 
-    case lists:member(NewUserName, State#serverState.users) of
+    case lists:member(OldUserName, State#serverState.users) of
         true when OldUserName =:= NewUserName ->
-            {reply, ok, State};
-        false ->
+            {reply, nick_taken, State};
+        true when OldUserName /= NewUserName ->
             TempList = [NewUserName | lists:delete(OldUserName, State#serverState.users)],
-            {reply, ok, State#serverState{users=TempList}}
+            {reply, ok, State#serverState{users=TempList}};
+        false ->
+            {reply, {error, user_not_found}, State}
         end;
 
 

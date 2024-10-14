@@ -10,6 +10,7 @@
     nick,
     % atom of the chat server
     server,
+    %channel list 
     channel
 }).
 
@@ -64,12 +65,11 @@ handle(St, {message_send, Channel, Msg}) ->
             {reply, {error, user_not_joined, "Not a member of channel "++Channel}, St}
         end;
 
-
-
 % This case is only relevant for the distinction assignment!
 
 % Change nick (no check, local only)
 handle(St, {nick, NewNick}) ->
+
     {reply, ok, St#client_st{nick = NewNick}};
 % ---------------------------------------------------------------------------
 % The cases below do not need to be changed...
