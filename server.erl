@@ -15,7 +15,7 @@ initial_state() ->
 % Start a new server process with the given name
 % Do not change the signature of this function.
 start(ServerAtom) ->
-    genserver:start(ServerAtom, initial_state(), handle/2).
+    genserver:start(ServerAtom, initial_state(), fun handle/2).
 
 % Stop the server process registered to the given name,
 % together with any other associated processes
@@ -23,19 +23,19 @@ stop(ServerAtom) ->
     genserver:stop(ServerAtom).
 
 handle(State, {join, Pid, NewUserName, Channel}) ->
-    case lists:member({NewUserName, Pid}, State#serverState.users) of
-        true ->
-            {reply, {error, already_in_channel}, State};
-        false ->
-            %% Add the user to the channel
-            NewUsers = [{NewUserName, Pid} | State#serverState.users],
-            NewState = State#serverState{users = NewUsers},
-            {reply, {ok, Channel}, NewState}
-    end;
+    NewNicksList =
+        case lists:member(NewUserName, State#serverState.users) of
+            true  -> State#serverState.users;
+            false -> [NewUserName | State#serverState.users]
+        end,
+    NewChannelsList =
+        case lists:member(Channel, State#serverState.channels) of
+            true  -> State#serverState.channels;
+            false -> channel:start(Channel), [Channel | State#serverState.channels]
+        end,
+    ChannelResponse = genserver:request(list_to_atom(Channel), {join, Pid}),
+    {reply, ChannelResponse, State#serverState{users= NewNicksList, channels=NewChannelsList}};
 
-
-%function that handles the quitComand and that replyes with ok
-% and with the state without the deleted user
 handle(State, {quit, UserName}) ->
     TempList = lists:delete(UserName, State#serverState.users),
     {reply, ok, State#serverState{users = TempList}}; 

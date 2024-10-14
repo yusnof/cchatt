@@ -33,29 +33,41 @@ initial_state(Nick, GUIAtom, ServerAtom) ->
 
 % Join channel
 handle(St, {join, Channel}) ->
-    case genserver:request(St#client_st.server, {join, self(), St#client_st.nick, Channel}) of
+    case helpFunction(St#client_st.server, {join, self(), St#client_st.nick, Channel}) of
         ok ->
             TempList = [Channel | St#client_st.channel],
-            {reply, ok, St#client_st{channel = TempList}};
-        noOkey -> {reply, "NOOOO", St}
+            {reply, ok, St#client_st{channel=TempList}};
+        Error ->
+            {reply, Error, St}
+            
+ 
     end;
+
 % Leave channel
 handle(St, {leave, Channel}) ->
-    % TODO: Implement this function
-    % {reply, ok, St} ;
-    case lists:member(Channel , St#client_st.channel) of 
-        true -> 
-            TempList = lists:delete(Channel , St#client_st.channel),
-            genserver:request(St#client_st.server, {quit,St#client_st.nick,Channel}),
-        {reply, {error, not_implemented, "leave not implemented"}, St};
-        false -> ok; 
+    case lists:member(Channel, St#client_st.channel) of
+        true ->
+            ChannelReply = helpFunction(list_to_atom(Channel), {leave, self()}),
+            TempList = lists:delete(Channel, St#client_st.channel),
+            {reply, ChannelReply, St#client_st{channel=TempList}};
+        false ->
+            {reply, {error, user_not_joined, "Not a member of channel "++Channel}, St}
+        end;
 
 % Sending message (from GUI, to channel)
 handle(St, {message_send, Channel, Msg}) ->
-    % TODO: Implement this function
-    % {reply, ok, St} ;
-    {reply, {error, not_implemented, "message sending not implemented"}, St};
+    case lists:member(Channel, St#client_st.channel) of
+        true ->
+            TempList = helpFunction(list_to_atom(Channel), {message_send, self(), St#client_st.nick, Msg}),
+            {reply, TempList, St};
+        false ->
+            {reply, {error, user_not_joined, "Not a member of channel "++Channel}, St}
+        end;
+
+
+
 % This case is only relevant for the distinction assignment!
+
 % Change nick (no check, local only)
 handle(St, {nick, NewNick}) ->
     {reply, ok, St#client_st{nick = NewNick}};
@@ -77,3 +89,12 @@ handle(St, quit) ->
 % Catch-all for any unhandled requests
 handle(St, Data) ->
     {reply, {error, not_implemented, "Client does not handle this command"}, St}.
+
+
+
+helpFunction(DestinationAtom, Request) ->
+        try genserver:request(DestinationAtom, Request) of
+            Response -> Response
+        catch
+            error:_ -> {error, server_not_reached, "Server not reached!"}
+        end.
