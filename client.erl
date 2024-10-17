@@ -64,22 +64,19 @@ handle(St, {leave, Channel}) ->
     end;
 % Sending message (from GUI, to channel)
 handle(St, {message_send, Channel, Msg}) ->
-    Response = connectFunction(list_to_atom(Channel), {message_send, self(), St#client_st.nick, Msg}),
+    Response = catch connectFunction(list_to_atom(Channel), {message_send, self(), St#client_st.nick, Msg}),
     case lists:member(Channel, St#client_st.channels) of
         true ->
             % Client is a member, proceed to send message
-            case catch Response of
-                ok -> {reply, Response, St};
+            case Response of
+                ok -> {reply, ok, St};
                 timeout_error -> {reply, {error, server_not_reached, "Server not reached"}, St};
-                Error -> {reply, Error, St}
+                Error -> {reply, {error, Error}, St}
             end;
         
         false ->
-            % Client is not a member, return appropriate error
-        case catch Response of 
-        ok -> {reply, {error, user_not_joined, "Not a member of channel " ++ Channel}, St};
-        timeout_error -> {reply, {error, server_not_reached, "Not a member of channel" ++ Channel}, St};
-        Error ->  {reply, Error, St} end
+            % Client is not a member, return error directly without server communication
+            {reply, {error, user_not_joined, "Not a member of channel " ++ atom_to_list(Channel)}, St}
     end;
 
    
@@ -117,8 +114,13 @@ handle(St, Data) ->
 
 connectFunction(Destination, Request) ->
     case catch genserver:request(Destination, Request) of
-        % if the server process cannot be reached
-        {'EXIT', Reason} -> {error, server_not_reached, Reason};
+        % If the server process cannot be reached (e.g., the process doesn't exist)
+        {'EXIT', Reason} ->
+            case Reason of
+                timeout -> {error, server_not_reached, "Request timed out"};
+                _ -> {error, server_not_reached, Reason}
+            end;
+        % If the request succeeds, return the response
         Response -> Response
     end.
 

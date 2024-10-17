@@ -21,13 +21,14 @@ start(ServerAtom) ->
 % together with any other associated processes
 stop(ServerAtom) ->
     genserver:request(ServerAtom, delete_all_channels),
+    initial_state(),
     genserver:stop(ServerAtom).
 
 handle(State, {join, Pid, NewUserName, Channel}) ->
     NewNicksList =
         case lists:member(NewUserName, State#serverState.users) of
             true  -> State#serverState.users;
-            false -> [NewUserName | State#serverState.users]
+            false -> [NewUserName | State#serverState.users] 
         end,
     NewChannelsList =
         case lists:member(Channel, State#serverState.channels) of
@@ -63,5 +64,5 @@ fun(Ch) -> genserver:stop(list_to_atom(Ch)) end, State#serverState.channels
 {reply,ok,[]};
 
 %ToDo catch other commands with some type of exeption
-handle(State, _ ) ->
+handle(State, _) ->
     {reply, {error, not_implemented}, State}.

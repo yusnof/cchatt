@@ -29,12 +29,10 @@ handle(St, {leave, Pid}) ->
 
 handle(St, {message_send, ClientPid, ClientNick, Msg}) ->
     OtherMembers = lists:delete(ClientPid, St#channel_st.members),
-    case OtherMembers == St#channel_st.members of 
-    false -> 
     Data = {request, self(), make_ref(), {message_receive, St#channel_st.name, ClientNick, Msg}},
     lists:foreach((fun(Member) -> Member ! Data end), OtherMembers),
     {reply, ok, St};
-    true -> {reply, {error, user_not_joined}, St} end;
+    
 
 handle(St, _) ->
     {reply, {error, not_implemented, "Channel cannot handle this request!"}, St} .
