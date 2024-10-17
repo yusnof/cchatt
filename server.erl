@@ -34,8 +34,9 @@ handle(State, {join, Pid, NewUserName, Channel}) ->
             true  -> State#serverState.channels;
             false -> channel:start(Channel), [Channel | State#serverState.channels]
         end,
-    ChannelResponse = genserver:request(list_to_atom(Channel), {join, Pid}),
+    ChannelResponse = catch (genserver:request(list_to_atom(Channel), {join, Pid})),
     {reply, ChannelResponse, State#serverState{users= NewNicksList, channels=NewChannelsList}};
+
 
 handle(State, {quit, UserName}) ->
     TempList = lists:delete(UserName, State#serverState.users),
@@ -55,7 +56,10 @@ handle(State,{nick, OldUserName, NewUserName})->
         end;
 
 handle(State, delete_all_channels) ->
-lists:foreach(fun(Ch) -> genserver:stop(list_to_atom(Ch)) end, State),
+lists:foreach(
+fun(Ch) -> genserver:stop(list_to_atom(Ch)) end, State#serverState.channels
+),
+
 {reply,ok,[]};
 
 %ToDo catch other commands with some type of exeption

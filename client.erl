@@ -75,7 +75,8 @@ handle(St, {message_send, Channel, Msg}) ->
                 Error -> {reply, Error, St}
             end;
         false ->
-      {reply, {error, user_not_joined, "Not a member of channel " ++ Channel}, St} end;
+        {reply, {error, user_not_joined, "Not a member of channel " ++ Channel}, St} end;
+
    
 % This case is only relevant for the distinction assignment!
 
