@@ -34,7 +34,7 @@ handle(State, {join, Pid, NewUserName, Channel}) ->
             true  -> State#serverState.channels;
             false -> channel:start(Channel), [Channel | State#serverState.channels]
         end,
-    ChannelResponse = catch (genserver:request(list_to_atom(Channel), {join, Pid})),
+    ChannelResponse =  catch (genserver:request(list_to_atom(Channel), {join, Pid})),
     {reply, ChannelResponse, State#serverState{users= NewNicksList, channels=NewChannelsList}};
 
 

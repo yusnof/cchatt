@@ -11,7 +11,7 @@
     % atom of the chat server
     server,
     %channel list
-    channel
+    channels
 }).
 
 % Return an initial state record. This is called from GUI.
@@ -21,7 +21,7 @@ initial_state(Nick, GUIAtom, ServerAtom) ->
         gui = GUIAtom,
         nick = Nick,
         server = ServerAtom,
-        channel = []
+        channels = []
     }.
 
 % handle/2 handles each kind of request from GUI
@@ -36,8 +36,8 @@ initial_state(Nick, GUIAtom, ServerAtom) ->
 handle(St, {join, Channel}) ->
     case catch (connectFunction(St#client_st.server, {join, self(), St#client_st.nick, Channel})) of
         ok ->
-            TempList = [Channel | St#client_st.channel],
-            {reply, ok, St#client_st{channel = TempList}};
+            TempList = [Channel | St#client_st.channels],
+            {reply, ok, St#client_st{channels = TempList}};
         timeout_error ->
             {reply, {error, server_not_reached, "Server not reached"}, St};
         Error ->
@@ -45,14 +45,14 @@ handle(St, {join, Channel}) ->
     end;
 % Leave channel
 handle(St, {leave, Channel}) ->
-    case lists:member(Channel, St#client_st.channel) of
+    case lists:member(Channel, St#client_st.channels) of
         true ->
             Request = connectFunction(list_to_atom(Channel), {leave, self()}),
             case catch (Request) of
                 ok ->
                     % If the operation is successful, remove the channel and update state
-                    TempList = lists:delete(Channel, St#client_st.channel),
-                    UpdatedState = St#client_st{channel = TempList},
+                    TempList = lists:delete(Channel, St#client_st.channels),
+                    UpdatedState = St#client_st{channels = TempList},
                     {reply, ok, UpdatedState};
                 timeout_error ->
                     {reply, {error, server_not_reached, "Server not reached"}, St};
@@ -64,18 +64,23 @@ handle(St, {leave, Channel}) ->
     end;
 % Sending message (from GUI, to channel)
 handle(St, {message_send, Channel, Msg}) ->
-    case lists:member(Channel, St#client_st.channel) of
+    Response = connectFunction(list_to_atom(Channel), {message_send, self(), St#client_st.nick, Msg}),
+    case lists:member(Channel, St#client_st.channels) of
         true ->
-            Response = connectFunction(
-                list_to_atom(Channel), {message_send, self(), St#client_st.nick, Msg}
-            ),
-            case catch (Response) of
+            % Client is a member, proceed to send message
+            case catch Response of
                 ok -> {reply, Response, St};
                 timeout_error -> {reply, {error, server_not_reached, "Server not reached"}, St};
                 Error -> {reply, Error, St}
             end;
+        
         false ->
-        {reply, {error, user_not_joined, "Not a member of channel " ++ Channel}, St} end;
+            % Client is not a member, return appropriate error
+        case catch Response of 
+        ok -> {reply, {error, user_not_joined, "Not a member of channel " ++ Channel}, St};
+        timeout_error -> {reply, {error, server_not_reached, "Not a member of channel" ++ Channel}, St};
+        Error ->  {reply, Error, St} end
+    end;
 
    
 % This case is only relevant for the distinction assignment!
@@ -101,7 +106,7 @@ handle(St = #client_st{gui = GUI}, {message_receive, Channel, Nick, Msg}) ->
 handle(St, quit) ->
     lists:foreach(
         fun(Channel) -> list_to_atom(Channel) ! {request, self(), make_ref(), {leave, self()}} end,
-        St#client_st.channel
+        St#client_st.channels
     ),
     % Tell server about the quit
     St#client_st.server ! {request, self(), make_ref(), {quit, St#client_st.nick}},
